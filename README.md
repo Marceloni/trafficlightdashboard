@@ -118,3 +118,10 @@ docs/          code review notes
 
 Both modules use the Java Platform Module System (`module-info.java`). The build uses Java 25,
 JavaFX 25, JMapViewer 2.25 (from the JOSM repository), SLF4J and JUnit 6.
+
+## License
+
+The source code is released under the [MIT License](LICENSE).
+
+Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available
+under the Open Database License. Bike data comes from [openSenseMap](https://opensensemap.org/).
