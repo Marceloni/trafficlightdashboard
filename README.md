@@ -1,93 +1,120 @@
-# developertools-template
+# Traffic Light Dashboard
 
+A JavaFX desktop app that shows traffic lights on an OpenStreetMap map, colored by how long
+cyclists wait at them. The waiting times come from the GPS speed measurements of
+[senseBox:bike](https://sensebox.de/en/products-bike) devices published on
+[openSenseMap](https://opensensemap.org/).
 
+The map starts at Heilbronn. Traffic lights for all of Baden-Württemberg are loaded, and bike
+data is fetched for whatever part of the map you look at.
+
+## Features
+
+- **Map** of OpenStreetMap tiles (JMapViewer embedded in JavaFX), panned with the left mouse
+  button. Traffic lights are shown from zoom level 14 on.
+- **Traffic light markers** whose lit lamp shows the average waiting time:
+
+  | Color  | Average wait     |
+  |--------|------------------|
+  | Green  | up to 20 s       |
+  | Yellow | 20 s to 40 s     |
+  | Red    | over 40 s        |
+  | Grey   | no measured wait |
+
+- **Details panel**: click a traffic light to see its number of waits, its average wait and
+  its most recent wait (when it happened, how long it was, and which senseBox measured it).
+- **Sidebar** listing the measured traffic lights in the visible area, sortable by longest or
+  shortest wait.
+- **Address search** using Nominatim. Places in Baden-Württemberg are preferred.
+- **Live updates**: new bike data is polled every 2 minutes.
+- **Local cache**, so later starts don't download everything again.
+
+## How waiting times are calculated
+
+`WaitingTimeCalculator` looks at each bike's measurements in time order. A *wait* is a run of
+measurements that are:
+
+- slower than 1 m/s,
+- within 30 m of the same traffic light, and
+- no more than 30 s apart.
+
+Stops shorter than 3 s are ignored. Stops longer than 3 minutes are treated as a parked bike,
+not a wait. A traffic light's rating is the average of all its waits.
+
+## Data sources
+
+| Data                     | Source                                                                   |
+|--------------------------|--------------------------------------------------------------------------|
+| Traffic light positions  | OpenStreetMap nodes tagged `highway=traffic_signals`, via the Overpass API (several public servers are queried at once and the first answer is used) |
+| Bike speed measurements  | openSenseMap API, mobile boxes, phenomenon `Speed`                       |
+| Address search           | Nominatim                                                                |
+| Map tiles                | OpenStreetMap tile server                                                |
+
+All of them are public services. You need an internet connection on the first start.
+
+## Requirements
+
+- JDK 25. If it isn't installed, Gradle downloads it through the Foojay toolchain resolver.
+- Nothing else. The Gradle wrapper (9.7.1) and every dependency are fetched automatically.
 
 ## Getting started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://git.it.hs-heilbronn.de/it/courses/seb/devtools/24ws/devtools-24-ws.git
-git branch -M main
-git push -uf origin main
+```sh
+./gradlew
 ```
 
-## Integrate with your tools
+The default task is `:javafx:runTrafficLightDashboard`, so this builds and starts the
+dashboard. The explicit form is:
 
-- [ ] [Set up project integrations](https://git.it.hs-heilbronn.de/it/courses/seb/devtools/24ws/devtools-24-ws/-/settings/integrations)
+```sh
+./gradlew :javafx:runTrafficLightDashboard
+```
 
-## Collaborate with your team
+**On the first start**, the app downloads:
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+- every traffic light in Baden-Württemberg, about 23,000 (this can take a few minutes when the
+  Overpass servers are busy), and
+- the last 90 days of bike data for Heilbronn.
 
-## Test and Deploy
+After that, it only loads what is new or what is in newly visited areas. When a service is
+unreachable, the app shows the cached data and retries.
 
-Use the built-in continuous integration in GitLab.
+### Cache
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+Cached data is stored in `~/.smarting-devtools/traffic-light-dashboard/`:
 
-***
+| File                 | Contents                                                       |
+|----------------------|----------------------------------------------------------------|
+| `traffic-lights.tsv` | Traffic lights (id, lat, lon, name). Refreshed after 30 days.   |
+| `bike-speeds.csv`    | All loaded bike speed measurements. New ones are appended.     |
+| `cache.properties`   | Which areas have been loaded, and up to which time             |
 
-# Editing this README
+Delete the directory to start fresh.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Development
 
-## Suggestions for a good README
+```sh
+./gradlew build    # compile and run the tests
+./gradlew test     # run the tests only
+./gradlew javadoc  # generate the API docs
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+### Project layout
 
-## Name
-Choose a self-explaining name for your project.
+```
+apis/     shared API module (devtools.apis): common exceptions
+javafx/   the JavaFX application (devtools.javafx)
+  src/main/java/de/hhn/it/devtools/javafx/trafficlightdashboard/
+    TrafficLightDashboardApp   GUI: map, sidebar, details panel, search, scheduling
+    TrafficDataLoader          HTTP clients for Overpass, openSenseMap and Nominatim
+    TrafficDataCache           reads and writes the local file cache
+    WaitingTimeCalculator      finds waits and computes the statistics for each traffic light
+    LoadedArea, MapArea        track which parts of the map have bike data
+    TrafficLightMarker         custom map marker drawing a small traffic light
+  src/test/java/...            JUnit tests for the calculator, cache and loaded area
+config/, etc/  Checkstyle and PMD rule sets
+docs/          code review notes
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Both modules use the Java Platform Module System (`module-info.java`). The build uses Java 25,
+JavaFX 25, JMapViewer 2.25 (from the JOSM repository), SLF4J and JUnit 6.
